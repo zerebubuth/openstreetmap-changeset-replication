@@ -1,3 +1,7 @@
+# Emacs temp
+*~
+
+# Ruby stuff
 *.gem
 *.rbc
 .bundle
