@@ -10,8 +10,10 @@ The replicator needs two YAML files:
 
 The configuration file should look like:
 
- state_file: state.yaml
- db: host=localhost dbname=openstreetmap user=openstreetmap password=XXXXX
- data_dir: replication/
+```yaml
+state_file: state.yaml
+db: host=localhost dbname=openstreetmap user=openstreetmap password=XXXXX
+data_dir: replication/
+```
 
 Replicated files will be created under the `data_dir` directory as gzipped `.osm` files.
