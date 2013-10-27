@@ -24,20 +24,20 @@ class Changeset
   def initialize(row)
     @id = row['id'].to_i
     @created_at = Time.parse(row['created_at'])
-    @closed_at = Time.parse(row['created_at'])
+    @closed_at = Time.parse(row['closed_at'])
     @num_changes = row['num_changes'].to_i
   end
 
-  def closed?
-    (@closed_at <= Time.now.getutc) || (@num_changes >= CHANGES_LIMIT)
+  def closed?(t)
+    (@closed_at < t) || (@num_changes >= CHANGES_LIMIT)
   end
 
-  def open?
-    !closed?
+  def open?(t)
+    not closed?(t)
   end
 
-  def closed_since?(t)
-    (@closed_at > t) && closed?
+  def activity_between?(t1, t2)
+    ((@closed_at >= t1) && (@closed_at < t2)) || ((@created_at >= t1) && (@created_at < t2))
   end
 end
 
@@ -61,9 +61,9 @@ class Replicator
     # for us to look at anything that was closed recently, and filter from
     # there.
     @conn.
-      exec("select id, created_at, closed_at, num_changes from changesets where closed_at > (now() - '1 hour'::interval)").
+      exec("select id, created_at, closed_at, num_changes from changesets where closed_at > ((now() at time zone 'utc') - '1 hour'::interval)").
       map {|row| Changeset.new(row) }.
-      select {|cs| cs.closed_since?(last_run) || cs.open? }
+      select {|cs| cs.activity_between?(last_run, @now) }
   end
 
   # creates an XML file containing the changeset information from the 
@@ -82,9 +82,9 @@ class Replicator
       xml = XML::Node.new("changeset")
       xml['id'] = cs.id.to_s
       xml['created_at'] = cs.created_at.getutc.xmlschema
-      xml['closed_at'] = cs.closed_at.getutc.xmlschema if cs.closed?
-      xml['open'] = cs.open?.to_s
-      xml['num_changes'] = cs.num_changes.to_s
+      xml['closed_at'] = cs.closed_at.getutc.xmlschema if cs.closed?(@now)
+      xml['open'] = cs.open?(@now).to_s
+      xml['num_changes'] = cs.num_changes
 
       res = @conn.exec("select u.id, u.display_name, c.min_lat, c.max_lat, c.min_lon, c.max_lon from users u join changesets c on u.id=c.user_id where c.id=#{cs.id}")
       xml['user'] = res[0]['display_name']
@@ -150,3 +150,4 @@ end
 
 rep = Replicator.new(ARGV[0])
 rep.save!
+
